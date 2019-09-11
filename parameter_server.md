@@ -6,7 +6,7 @@
 
 embedding table可以理解为一个<key, value>的结构，key为item id，value为对应item id的embedding vector。
 
-同时，item id和pserver id之间有一个映射关系，给定一个key，就能查到对应的pserver id，也就意味着该item id的embedding vector实际上存放在该pserver中。
+同时，item id和pserver id之间有一个映射关系，给定一个item id，就能查到对应的pserver id，也就意味着该item id的embedding vector实际上存放在该pserver中。
 
 对于其他的parameter，我们设置一个size，如果parameter大于size，那么这个parameter也需要被sharding。
 
@@ -18,13 +18,13 @@ embedding table可以理解为一个<key, value>的结构，key为item id，valu
 
 ## Init Parameter
 
-embedding table参数的初始化是lazy的，在训练中fetch参数的时候一起初始化。
+embedding table参数的初始化是lazy的，在训练中pull参数的时候一起初始化。
 
 其他parameter的初始化可以在训练之前进行。
 
 ## Pull Parameter
 
-对于每一个worker，在每个layer进行forward计算之前，需要从pserver上拉取parameter到本地。
+对于每一个worker，在每个layer进行forward计算之前，需要从pserver上拉取参数到本地。
 
 对于embedding layer来说，输入是一个batch的数据，因此item id是一个vector。
 
