@@ -33,11 +33,16 @@ Master负责对training process的整体控制。
 Worker和Pserver需要接受master的控制。其中worker负责完成training task和evaluation task；pserver提供kv store以及checkpoint服务。
 
 1. master对training dataset进行切分，得到一段数据的<start_addr, end_addr>，然后打包成一个training task发送给worker节点 （worker节点收到training_task，解析得到数据的位置，从这里开始读取，并进一步切分成minibatch数据，进行training任务）
-2. master会记录总共打包了多少个minibatch的task出去，当到达设定的iteration之后，会开始打包validation dataset数据，形成一个evaluation task，发送给worker节点（worker节点开始evaluation任务。到目前为止，worker之间都是相互独立的，即每个worker只关注自己拿到的任务，做完即可。evalution也只是当前worker对拿到的部分validation dataset进行打分）
+2. master会记录总共打包了多少个minibatch的task出去，当到达设定的iteration之后，会开始打包validation dataset数据，形成许多个evaluation task，发送给worker节点（worker节点开始evaluation任务。到目前为止，worker之间都是相互独立的，即每个worker只关注自己拿到的任务，做完即可。evaluation也只是当前worker对自己拿到的部分validation dataset进行打分）
 3. 当master发现所有的training dataset都已经发送完毕之后，master会通知pserver，让pserver启动一个checkpoint任务 （pserver会开始对现有的模型参数进行复制，得到checkpoint，暂存在内存中）
 4. 在checkpoint完成之后，master会打包validation dataset给worker，要求worker对checkpoint进行打分 （这里要注意，worker读取的是checkpoint中的模型参数，同时worker这时需汇报必要中间结果给master，master得到所有worker对所有validation dataset的评价后，进行汇总和计算，最终给出一个分数）
 5. master得到一个epoch训练结束后对全部validation dataset的打分，通知pserver把checkpoint从内存中写入磁盘，并且把对应的evaluation结果写入磁盘
 6. master重新回到step 1，开始下一个epoch的训练
+
+
+**Note**
+
+每个epoch之内的evaluation是workr针对局部数据做的，仅仅是参考；每个epoch之间的evaluation，是对全部validation dataset进行统计汇总之后得到的结果，用于最终选择模型
 
 
 
