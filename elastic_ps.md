@@ -58,4 +58,4 @@ ElasticDL通过对深度学习任务进行合理调度，满足用户需求，�
 
 ## Summary
 
-因为worker是无状态的，处理相对简单；pserver是有状态的，处理相对复杂。但是我们考虑到pserver对资源占用大头是network bandwidth，而CPU/memory相对充裕，我们把对pserver的容错和动态伸调整合在一起考虑，我们不需要kill掉pserver pod，而是转化为限制pserver的network bandwidth。
+因为worker是无状态的，处理相对简单；pserver是有状态的，处理相对复杂。但是我们考虑到pserver对资源占用大头是network bandwidth，而CPU/memory相对充裕，我们把对pserver的容错和动态伸调整合在一起考虑，我们不需要kill掉pserver pod，而是转化为限制pserver的network bandwidth。这样就既解决了pserver状态维护，又可以弹性的对pserver占用的资源进行控制。
