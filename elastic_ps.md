@@ -64,6 +64,6 @@ ElasticDL通过对深度学习任务进行合理调度，满足用户需求，�
 
 因为worker是无状态的，处理相对简单；pserver是有状态的，处理相对复杂。但是我们考虑到pserver对资源占用大头是network bandwidth，而CPU/memory相对充裕，我们把对pserver的容错和动态伸调整合在一起考虑，我们不需要kill掉pserver pod，而是转化为限制pserver的network bandwidth。这样就既解决了pserver状态维护，又可以弹性的对pserver占用的资源进行控制。
 
-更何况，我们就算kill掉一些数据的pserver pod，又使用某种机制，重新保持了pserver pod持有完整的模型参数，这时，相比上述方案，占有的memory资源是一样的，CPU资源少了一些。同样也是因为减少了pserver pod的数目，减少了对network bandwidth的占用。
+更何况，我们就算kill掉一些pserver pod，又使用某种机制，重新保持了剩余的pserver pod持有完整的模型参数，这时，相比上述方案，占有的memory资源是一样的，CPU资源少了一些。同样，因为减少了pserver pod的数目，减少了对network bandwidth的占用。
 
-综上，直接限制低优先级pserver pod的network bandwidth，与kill掉pserver pod，进而减少pserver pod的资源占用，两者相比，仅仅多损耗了一些CPU。而这里的对pserver的实现性能与复杂度相比，仅仅损失一些CPU，是值得的。
+综上，直接限制低优先级pserver pod的network bandwidth，与kill掉pserver pod，进而减少pserver pod的资源占用，两者相比，仅仅多损耗了一些CPU。而考虑到两种方案pserver的实现性能与复杂度的差距，限制network bandwidth的方案，仅仅损失一些CPU，是值得的。
