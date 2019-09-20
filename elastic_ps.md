@@ -66,6 +66,4 @@ ElasticDL通过对深度学习任务进行合理调度，满足用户需求，�
 
 更何况，我们就算kill掉一些数据的pserver pod，又使用某种机制，重新保持了pserver pod持有完整的模型参数，这时，相比上述方案，占有的memory资源是一样的，CPU资源少了一些。同样也是因为减少了pserver pod的数目，减少了对network bandwidth的占用。
 
-综上，直接限制低优先级pserver pod的network bandwidth，与kill掉pserver pod，进而减少pserver pod的资源占用，两者相比，仅仅多损耗了一些CPU。
-
-而这里的对pserver的实现性能与复杂度相比，仅仅损失一些CPU，是值得的。
+综上，直接限制低优先级pserver pod的network bandwidth，与kill掉pserver pod，进而减少pserver pod的资源占用，两者相比，仅仅多损耗了一些CPU。而这里的对pserver的实现性能与复杂度相比，仅仅损失一些CPU，是值得的。
