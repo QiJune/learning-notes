@@ -3,23 +3,22 @@ syntax = "proto3";
 import "google/protobuf/empty.proto";
 
 message Tensor {
-	enum Type {
-    	BOOL = 0;
+    enum Type {
+        BOOL = 0;
     	INT16 = 1;
     	INT32 = 2;
     	INT64 = 3;
     	FP16 = 4;
     	FP32 = 5;
     	FP64 = 6;
-  	}
-	string name = 1;
+    }
+    string name = 1;
     Type data_type = 2;
-	repeated int64 dim = 3;
+    repeated int64 dim = 3;
     bytes content = 4;
 }
 
 service KVStore {
-	// only have name field is set
     rpc pull_param(Tensor) returns (Tensor) {}
     rpc pull_or_init_param(Tensor) returns (Tensor) {}
     rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
