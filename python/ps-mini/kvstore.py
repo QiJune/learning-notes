@@ -1,8 +1,8 @@
 from google.protobuf import empty_pb2
 import numpy as np
 
-import kvstore_pb2
-import kvstore_pb2_grpc
+import core_pb2
+import core_pb2_grpc
 
 from helper import np_dtype_to_dtype, dtype_to_np_dtype, size_of_dtype
 from helper import ndarray_to_tensor, tensor_to_ndarray
@@ -10,7 +10,7 @@ from helper import ndarray_to_tensor, tensor_to_ndarray
 import queue
 from helper import dtype_to_np_dtype
     
-class KVStoreServicer(kvstore_pb2_grpc.KVStoreServicer):
+class KVStoreServicer(core_pb2_grpc.KVStoreServicer):
     def __init__(self):
         self.db = {}
         self.grads = queue.Queue()

@@ -1,4 +1,4 @@
-from kvstore_service import KVStoreServicer
+from kvstore import KVStoreServicer
 import tensorflow as tf
 from tensorflow.keras.optimizers import SGD
 
@@ -6,8 +6,10 @@ import grpc
 from concurrent import futures
 import time
 
-import kvstore_pb2
-import kvstore_pb2_grpc
+import core_pb2
+import core_pb2_grpc
+
+import argparse
 
 class PServer(object):
     def __init__(self, opt):
@@ -29,12 +31,12 @@ class PServer(object):
 
         self.kvstore.update_db((param_name, param_var.numpy()))
 
-    def start(self):
+    def start(self, endpoint):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        kvstore_pb2_grpc.add_KVStoreServicer_to_server(
+        core_pb2_grpc.add_KVStoreServicer_to_server(
             self.kvstore, server)
-        print('Starting server. Listening on port 50051.')
-        server.add_insecure_port('[::]:50051')
+        print('Starting server. Listening on endpoint %s.' % endpoint)
+        server.add_insecure_port(endpoint)
         server.start()
         try:
             while True:
@@ -44,6 +46,10 @@ class PServer(object):
 
 
 if __name__ == "__main__":
+    parser=argparse.ArgumentParser()
+    parser.add_argument("-e", "--endpoint", type=str)
+    args=parser.parse_args()
+
     opt = SGD(lr=0.1)
     ps = PServer(opt)
-    ps.start()
+    ps.start(args.endpoint)

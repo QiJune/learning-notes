@@ -18,8 +18,20 @@ message Tensor {
     bytes content = 4;
 }
 
+message EndPoint {
+    repeated string endpoint = 1;
+}
+
+message Worker {
+    int64 id = 1;
+}
+
 service KVStore {
     rpc pull_param(Tensor) returns (Tensor) {}
     rpc pull_or_init_param(Tensor) returns (Tensor) {}
     rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
+}
+
+service Master {
+    rpc get_pserver(Worker) returns (EndPoint) {}
 }

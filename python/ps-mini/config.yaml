@@ -1,0 +1,4 @@
+endpoints:
+  - "localhost:50051"
+
+worker_num: 1
