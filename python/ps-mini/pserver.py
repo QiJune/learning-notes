@@ -8,6 +8,21 @@ from kvstore import KVStoreServicer
 from tensorflow.keras.optimizers import SGD
 
 
+def convert_to_var(param):
+    if param.indices:
+        new_dim = (None,) + param.value.shape[1:]
+        shape = tf.TensorShape(new_dim)
+        var = tf.Variable(param.value, shape=shape)
+        return var
+    return tf.Variable(param.value)
+
+
+def convert_to_tensor(param):
+    if param.indices is not None:
+        return tf.IndexedSlices(param.value, param.indices)
+    return tf.convert_to_tensor(param.value)
+
+
 class PServer(object):
     def __init__(self, opt, grads_to_wait):
         self.kvstore = KVStoreServicer()
@@ -37,19 +52,6 @@ class PServer(object):
                 param.name, param.indices, param.value
             )
 
-    def convert_to_var(self, param):
-        if param.indices:
-            new_dim = (None,) + param.value.shape[1:]
-            shape = tf.TensorShape(new_dim)
-            var = tf.Variable(param.value, shape=shape)
-            return var
-        return tf.Variable(param.value)
-
-    def convert_to_tensor(self, param):
-        if param.indices is not None:
-            return tf.IndexedSlices(param.value, param.indices)
-        return tf.convert_to_tensor(param.value)
-
     def get_gradient(self):
         if self.use_async:
             cur_gradient = self.kvstore.grads.get()
@@ -67,11 +69,9 @@ class PServer(object):
         grad = self.get_gradient()
         param = self.get_param(grad)
 
-        param_var = self.convert_to_var(param)
+        param_var = convert_to_var(param)
 
-        grads_and_params = list(
-            zip([self.convert_to_tensor(grad)], [param_var])
-        )
+        grads_and_params = list(zip([convert_to_tensor(grad)], [param_var]))
 
         self.opt.apply_gradients(grads_and_params)
         print("apply_gradient sucess")
@@ -87,7 +87,6 @@ class PServer(object):
         server.start()
         try:
             while True:
-                # time.sleep(10000)
                 self.apply_gradient()
         except KeyboardInterrupt:
             server.stop(0)

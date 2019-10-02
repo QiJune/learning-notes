@@ -74,11 +74,23 @@ class Worker(object):
         serialize_to_pb(grad, pb)
         self.pserver_stubs[0].push_embedding_grad(pb)
 
-    def pull_param(self):
-        pass
+    def pull_param(self, name):
+        pb = core_pb2.Tensor()
+        pb.name = name
+        res = self.pserver_stubs[0].pull_param(pb)
+        tensor = Tensor()
+        deserialize_from_pb(res, tensor)
+        return tensor
 
-    def push_grad(self):
-        pass
+    def push_grad(self, grad):
+        pb = core_pb2.Tensor()
+        serialize_to_pb(grad, pb)
+        self.pserver_stubs[0].push_grad(pb)
+
+    def push_param(self, param):
+        pb = core_pb2.Tensor()
+        serialize_to_pb(param, pb)
+        self.pserver_stubs[0].push_param(pb)
 
 
 if __name__ == "__main__":
