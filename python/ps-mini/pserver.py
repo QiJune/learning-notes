@@ -1,55 +1,103 @@
-from kvstore import KVStoreServicer
+import argparse
+from concurrent import futures
+
+import core_pb2_grpc
+import grpc
 import tensorflow as tf
+from kvstore import KVStoreServicer
 from tensorflow.keras.optimizers import SGD
 
-import grpc
-from concurrent import futures
-import time
-
-import core_pb2
-import core_pb2_grpc
-
-import argparse
 
 class PServer(object):
-    def __init__(self, opt):
+    def __init__(self, opt, grads_to_wait):
         self.kvstore = KVStoreServicer()
         self.opt = opt
-    
-    def apply_gradient(self):
+        self.grads_to_wait = grads_to_wait
+        self.use_async = False
+        self.version = -1
+        if self.grads_to_wait == 1:
+            self.use_async = True
+
+        self.grads_num = {}
+
+    def get_param(self, grad):
+        if len(grad.indices) == 0:
+            return self.kvstore.get_param(grad.name)
+        else:
+            y, idx = tf.unique(grad.indices)
+            grad.indices = idx.numpy()
+            param = self.kvstore.get_embedding_param(grad.name, y.numpy())
+            return param
+
+    def set_param(self, param):
+        if len(param.indices) == 0:
+            self.kvstore.set_param(param.name, param)
+        else:
+            self.kvstore.set_embedding_param(
+                param.name, param.indices, param.value
+            )
+
+    def convert_to_var(self, param):
+        if param.indices:
+            new_dim = (None,) + param.value.shape[1:]
+            shape = tf.TensorShape(new_dim)
+            var = tf.Variable(param.value, shape=shape)
+            return var
+        return tf.Variable(param.value)
+
+    def convert_to_tensor(self, param):
+        if param.indices is not None:
+            return tf.IndexedSlices(param.value, param.indices)
+        return tf.convert_to_tensor(param.value)
+
+    def get_gradient(self):
+        if self.use_async:
+            cur_gradient = self.kvstore.grads.get()
+            return cur_gradient
+
         cur_gradient = self.kvstore.grads.get()
-        grad_name, grad = cur_gradient[0], cur_gradient[1]
-        param_name = grad_name[0:-5]
-        param = self.kvstore.query_db(param_name)
+        while (cur_gradient != self.version) and (
+            self.grads_num[cur_gradient.name] < self.grads_to_wait
+        ):
+            cur_gradient = self.kvstore.grads.get()
 
-        grad = tf.convert_to_tensor(grad)
-        param_var = tf.Variable(tf.convert_to_tensor(param))
+        return cur_gradient
 
-        grads_and_params = list(zip([grad], [param_var]))
+    def apply_gradient(self):
+        grad = self.get_gradient()
+        param = self.get_param(grad)
+
+        param_var = self.convert_to_var(param)
+
+        grads_and_params = list(
+            zip([self.convert_to_tensor(grad)], [param_var])
+        )
+
         self.opt.apply_gradients(grads_and_params)
-        print('apply_gradient sucess')
+        print("apply_gradient sucess")
 
-        self.kvstore.update_db((param_name, param_var.numpy()))
+        param.value = param_var.numpy()
+        self.set_param(param)
 
     def start(self, endpoint):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        core_pb2_grpc.add_KVStoreServicer_to_server(
-            self.kvstore, server)
-        print('Starting server. Listening on endpoint %s.' % endpoint)
+        core_pb2_grpc.add_KVStoreServicer_to_server(self.kvstore, server)
+        print("Starting server. Listening on endpoint %s." % endpoint)
         server.add_insecure_port(endpoint)
         server.start()
         try:
             while True:
+                # time.sleep(10000)
                 self.apply_gradient()
         except KeyboardInterrupt:
             server.stop(0)
 
 
 if __name__ == "__main__":
-    parser=argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--endpoint", type=str)
-    args=parser.parse_args()
+    args = parser.parse_args()
 
     opt = SGD(lr=0.1)
-    ps = PServer(opt)
+    ps = PServer(opt, 1)
     ps.start(args.endpoint)

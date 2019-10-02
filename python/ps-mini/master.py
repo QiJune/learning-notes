@@ -1,21 +1,18 @@
-from google.protobuf import empty_pb2
-import numpy as np
-import yaml
+import argparse
 import subprocess
 import time
+from concurrent import futures
 
 import core_pb2
 import core_pb2_grpc
-
 import grpc
-from concurrent import futures
+import yaml
 
-import argparse
 
 class MasterServicer(core_pb2_grpc.MasterServicer):
     def __init__(self, endpoint):
         self.endpoint = endpoint
-        with open("config.yaml", 'r') as stream:
+        with open("config.yaml", "r") as stream:
             try:
                 data = yaml.safe_load(stream)
                 self.pserver_endpoints = data["endpoints"]
@@ -36,23 +33,23 @@ class MasterServicer(core_pb2_grpc.MasterServicer):
 
     def start_workers(self):
         for i in range(self.worker_num):
-            cmd = "python worker.py -e " + self.endpoint +  " -i " + str(i) + " &"
+            cmd = (
+                "python worker.py -e " + self.endpoint + " -i " + str(i) + " &"
+            )
             subprocess.run(cmd, shell=True, check=True, text=True)
-            
+
 
 if __name__ == "__main__":
-    parser=argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--endpoint", type=str)
-    args=parser.parse_args()
-
+    args = parser.parse_args()
 
     # Start Master
     master = MasterServicer(args.endpoint)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    core_pb2_grpc.add_MasterServicer_to_server(
-            master, server)
-    
-    print('Starting Master. Listening on endpoint %s.' % args.endpoint)
+    core_pb2_grpc.add_MasterServicer_to_server(master, server)
+
+    print("Starting Master. Listening on endpoint %s." % args.endpoint)
     server.add_insecure_port(args.endpoint)
     server.start()
 
@@ -68,6 +65,3 @@ if __name__ == "__main__":
             time.sleep(86400)
     except KeyboardInterrupt:
         server.stop(0)
-
-
-    

@@ -3,20 +3,38 @@ syntax = "proto3";
 import "google/protobuf/empty.proto";
 
 message Tensor {
-    enum Type {
+    enum DataType {
         BOOL = 0;
-    	INT16 = 1;
-    	INT32 = 2;
-    	INT64 = 3;
-    	FP16 = 4;
-    	FP32 = 5;
-    	FP64 = 6;
+        INT16 = 1;
+        INT32 = 2;
+        INT64 = 3;
+        FP16 = 4;
+        FP32 = 5;
+        FP64 = 6;
     }
     string name = 1;
-    Type data_type = 2;
+    DataType data_type = 2;
     repeated int64 dim = 3;
     bytes content = 4;
+    repeated int64 indices = 5;
+    int64 version = 6;
 }
+
+message EmbeddingResponse {
+    Tensor value = 1;
+    repeated int64 unknown_indices = 2;
+}
+
+service KVStore {
+    rpc pull_param(Tensor) returns (Tensor) {}
+    rpc push_param(Tensor) returns (google.protobuf.Empty) {}
+    rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
+
+    rpc pull_embedding_param(Tensor) returns (EmbeddingResponse) {}
+    rpc push_embedding_param(Tensor) returns (google.protobuf.Empty) {}
+    rpc push_embedding_grad(Tensor) returns (google.protobuf.Empty) {}
+}
+
 
 message EndPoint {
     repeated string endpoint = 1;
@@ -24,12 +42,6 @@ message EndPoint {
 
 message Worker {
     int64 id = 1;
-}
-
-service KVStore {
-    rpc pull_param(Tensor) returns (Tensor) {}
-    rpc pull_or_init_param(Tensor) returns (Tensor) {}
-    rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
 }
 
 service Master {

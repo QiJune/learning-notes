@@ -1,22 +1,11 @@
-from google.protobuf import empty_pb2
-import grpc
-import numpy as np
+import argparse
+import time
 
 import core_pb2
 import core_pb2_grpc
-
-import time
-
-from concurrent import futures
-
-from helper import np_dtype_to_dtype, dtype_to_np_dtype, size_of_dtype
-from helper import ndarray_to_tensor, tensor_to_ndarray
-
-import argparse
-
-import tensorflow as tf
-
-from tensorflow.keras import datasets, layers, optimizers, Sequential, metrics
+import grpc
+import numpy as np
+from tensor import Tensor, deserialize_from_pb, serialize_to_pb
 
 
 class Worker(object):
@@ -26,8 +15,7 @@ class Worker(object):
         self.master_channel = grpc.insecure_channel(self.master_endpoint)
         self.master_stub = core_pb2_grpc.MasterStub(self.master_channel)
         self.setup_pserver_stub()
-        self.executor = futures.ThreadPoolExecutor(max_workers=10)
-        
+
     def setup_pserver_stub(self):
         request = core_pb2.Worker()
         request.id = self.worker_id
@@ -38,85 +26,83 @@ class Worker(object):
             stub = core_pb2_grpc.KVStoreStub(channel)
             self.pserver_stubs.append(stub)
 
-    def _get_stub(self, id):
-        stub_num = len(self.pserver_stubs)
-        pserver_id = id % stub_num
-        return self.pserver_stubs[pserver_id]
+    def lookup_embedding_param(self, name, ids, dim):
+        tensor = Tensor(name, None, ids)
+        pb = core_pb2.Tensor()
+        serialize_to_pb(tensor, pb)
+        res = self.pserver_stubs[0].pull_embedding_param(pb)
+        know_ids = res.value.indices
+        unknown_ids = res.unknown_indices
 
-    def pull_or_init_param(self, name, ids, dim):
-        def impl(id):
-            stub = self._get_stub(id)
-            key = name + "_" + str(id)
-            param = core_pb2.Tensor()
-            param.name = key
-            param.dim.extend(dim)
-            param.data_type = core_pb2.Tensor.FP32
-            param = stub.pull_or_init_param(param)
-            param = tensor_to_ndarray(param)
-            return param
-        fs = [self.executor.submit(impl, id) for id in ids]
-        res = [f.result() for f in fs]
-        res = np.stack(res)
-        return res
+        if len(unknown_ids) == 0:
+            tensor = Tensor()
+            deserialize_from_pb(res.value, tensor)
+            return tensor
 
-    def param_sharding(self):
-        self.setup_network()
-        for var in self.network.trainable_variables:
-            print(var.name)
+        values = []
+        for id in unknown_ids:
+            tmp = np.ones(dim)
+            values.append(tmp)
+        value = np.stack(values)
+        tensor = Tensor(name, value, unknown_ids)
+        pb = core_pb2.Tensor()
+        serialize_to_pb(tensor, pb)
+        self.pserver_stubs[0].push_embedding_param(pb)
+        res_new = self.pserver_stubs[0].pull_embedding_param(pb)
+        unknown_ids_new = res_new.unknown_indices
+        if len(unknown_ids_new) > 0:
+            raise Exception("Update embedding vector failed")
 
+        if len(know_ids) == 0:
+            return tensor
+        else:
+            know_tensor = Tensor()
+            deserialize_from_pb(res.value, know_tensor)
+            know_tensor.indices.extend(tensor.indices)
+            know_tensor.value = np.append(know_tensor.value, tensor.value)
+            new_dim = (-1,) + dim
+            know_tensor.value = np.reshape(know_tensor.value, new_dim)
+            return know_tensor
 
-    def push_grad(self, grads):
-        pass
+    def push_embedding_param(self, param):
+        pb = core_pb2.Tensor()
+        serialize_to_pb(param, pb)
+        self.pserver_stubs[0].push_embedding_param(pb)
+
+    def push_embedding_grad(self, grad):
+        pb = core_pb2.Tensor()
+        serialize_to_pb(grad, pb)
+        self.pserver_stubs[0].push_embedding_grad(pb)
 
     def pull_param(self):
         pass
 
-    def push_param(self):
+    def push_grad(self):
         pass
-    
-    def setup_network(self):
-        self.network = Sequential([layers.Dense(256, activation='relu'),
-                     layers.Dense(256, activation='relu'),
-                     layers.Dense(256, activation='relu'),
-                     layers.Dense(10)])
-        self.network.build(input_shape=(None, 28*28))
 
-    def forward_backward(self, x, y):
-        self.pull_param()
-        with tf.GradientTape() as tape:
-            # [b, 28, 28] => [b, 784]
-            x = tf.reshape(x, (-1, 28*28))
-            # [b, 784] => [b, 10]
-            out = self.network(x)
-            # [b] => [b, 10]
-            y_onehot = tf.one_hot(y, depth=10)
-            # [b, 10]
-            loss = tf.square(out - y_onehot)
-            # [b]
-            self.loss = tf.reduce_sum(loss) / 32
-        grads = tape.gradient(self.loss, self.network.trainable_variables)
-        self.push_grad(grads)
 
-    def run(self):
-        (xs, ys), _ = datasets.mnist.load_data()
-        xs = tf.convert_to_tensor(xs, dtype=tf.float32) / 255.
-        db = tf.data.Dataset.from_tensor_slices((xs, ys))
-        db = db.batch(32).repeat(10)
-        for step, (x,y) in enumerate(db):
-            self.forward_backward(x, y)
-            if step % 200 == 0:
-                print(step, 'loss:', float(self.loss))
-
-        
 if __name__ == "__main__":
-    parser=argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--endpoint", type=str)
     parser.add_argument("-i", "--worker_id", type=int)
-    args=parser.parse_args()
+    args = parser.parse_args()
 
     worker = Worker(args.endpoint, args.worker_id)
 
     ids = [0, 1, 2, 3, 4, 5]
-    res = worker.pull_or_init_param("tom", ids, (3,))
-    for r in res:
-        print(r)
+    res = worker.lookup_embedding_param("tom", ids, (3,))
+    print(res.value)
+    print(res.indices)
+
+    ids = [0, 3, 3]
+    value = np.full((3, 3), 2.0)
+    grad = Tensor("tom", value, ids)
+
+    worker.push_embedding_grad(grad)
+
+    time.sleep(2)
+
+    ids = [0, 3, 7]
+    res = worker.lookup_embedding_param("tom", ids, (3,))
+    print(res.value)
+    print(res.indices)

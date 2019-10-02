@@ -1,5 +1,6 @@
-import numpy as np
 import core_pb2
+import numpy as np
+
 
 def np_dtype_to_dtype(np_dtype):
     if np_dtype == np.float16:
@@ -15,9 +16,10 @@ def np_dtype_to_dtype(np_dtype):
     elif np_dtype == np.int64:
         return core_pb2.Tensor.INT64
     elif np_dtype == np.bool:
-        return core_pb2.Tensor.BOOL 
+        return core_pb2.Tensor.BOOL
     else:
         raise ValueError("Not supported numpy dtype %s" % np_dtype)
+
 
 def dtype_to_np_dtype(dtype):
     if dtype == core_pb2.Tensor.FP16:
@@ -37,6 +39,7 @@ def dtype_to_np_dtype(dtype):
     else:
         raise ValueError("Not supported dtype %s" % dtype)
 
+
 def size_of_dtype(dtype):
     if dtype == core_pb2.Tensor.FP16:
         return 2
@@ -55,29 +58,56 @@ def size_of_dtype(dtype):
     else:
         raise ValueError("Not supported dtype %s" % dtype)
 
-def ndarray_to_tensor(name, arr):
-    tensor = core_pb2.Tensor()
-    tensor.name = name
-    tensor.dim.extend(arr.shape)
-    tensor.content = arr.tobytes()
-    tensor.data_type = np_dtype_to_dtype(arr.dtype)     
-    return tensor
 
-def tensor_to_ndarray(tensor):
-    size = size_of_dtype(tensor.data_type)
-    for d in tensor.dim:
-        size *= d
+class Tensor(object):
+    def __init__(self, name=None, value=None, indices=None, version=None):
+        self.name = name
+        self.value = value
+        self.indices = indices
+        self.version = version
 
-    if size != len(tensor.content):
-        raise ValueError(
-            "Tensor  size mismatch, dim: %s, len(content): %d",
-            tensor.dim,
-            len(tensor.content),
+    def debug_string(self):
+        res = ""
+        if self.name:
+            res += "name: " + self.name + "\n"
+        if self.value is not None:
+            res += "value: " + str(self.value) + "\n"
+        if self.indices is not None:
+            res += "indices: " + str(self.indices)
+        return res
+
+
+def serialize_to_pb(tensor, pb):
+    pb.name = tensor.name
+    if tensor.value is not None:
+        pb.dim.extend(tensor.value.shape)
+        pb.data_type = np_dtype_to_dtype(tensor.value.dtype)
+        pb.content = tensor.value.tobytes()
+    if tensor.indices is not None:
+        pb.indices.extend(tensor.indices)
+    if tensor.version:
+        pb.version = tensor.version
+
+
+def deserialize_from_pb(pb, tensor):
+    if len(pb.content) > 0:
+        size = size_of_dtype(pb.data_type)
+        for d in pb.dim:
+            size *= d
+
+        if size != len(pb.content):
+            raise ValueError(
+                "Tensor  size mismatch, dim: %s, len(content): %d",
+                pb.dim,
+                len(pb.content),
+            )
+
+        arr = np.ndarray(
+            shape=pb.dim,
+            dtype=dtype_to_np_dtype(pb.data_type),
+            buffer=pb.content,
         )
-
-    arr = np.ndarray(
-            shape=tensor.dim,
-            dtype=dtype_to_np_dtype(tensor.data_type),
-            buffer=tensor.content
-        )
-    return arr
+        tensor.value = arr
+    tensor.name = pb.name
+    tensor.indices = pb.indices
+    tensor.version = pb.version
