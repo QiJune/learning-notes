@@ -4,7 +4,7 @@ from concurrent import futures
 import core_pb2_grpc
 import grpc
 import tensorflow as tf
-from kvstore import KVStoreServicer
+from kvstore_service import KVStoreServicer
 from tensorflow.keras.optimizers import SGD
 
 
