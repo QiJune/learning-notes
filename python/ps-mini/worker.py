@@ -1,96 +1,111 @@
 import argparse
-import time
+import os
 
-import core_pb2
-import core_pb2_grpc
-import grpc
 import numpy as np
-from tensor import Tensor, deserialize_from_pb, serialize_to_pb
+import tensorflow as tf
+from embedding import Embedding
+from kvstore_client import KVStoreClient
+from tensor import Tensor
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+assert tf.__version__.startswith("2.")
+
+tf.random.set_seed(22)
+np.random.seed(22)
+
+
+class RNN(tf.keras.Model):
+    def __init__(self, units, max_review_length):
+        super(RNN, self).__init__()
+
+        self.rnn = tf.keras.layers.LSTM(units)
+        self.embedding = Embedding(100, input_length=max_review_length)
+        self.fc = tf.keras.layers.Dense(1, activation="sigmoid")
+
+    def call(self, inputs, training):
+        x = self.embedding(inputs)
+        x = self.rnn(x)
+        x = self.fc(x)
+        return x
+
+
+def get_dataset(max_review_length):
+    # load the dataset but only keep the top n words, zero the rest
+    top_words = 5000
+
+    (X_train, y_train), (X_test, y_test) = tf.keras.datasets.imdb.load_data(
+        num_words=top_words
+    )
+    x_train = tf.keras.preprocessing.sequence.pad_sequences(
+        X_train, maxlen=max_review_length
+    )
+    x_test = tf.keras.preprocessing.sequence.pad_sequences(
+        X_test, maxlen=max_review_length
+    )
+
+    return x_train, y_train, x_test, y_test
 
 
 class Worker(object):
     def __init__(self, master_endpoint, worker_id):
-        self.master_endpoint = master_endpoint
-        self.worker_id = worker_id
-        self.master_channel = grpc.insecure_channel(self.master_endpoint)
-        self.master_stub = core_pb2_grpc.MasterStub(self.master_channel)
-        self.setup_pserver_stub()
+        self.kvstore_client = KVStoreClient(master_endpoint, worker_id)
+        self.metric = tf.keras.metrics.Accuracy()
+        self.init = False
+        self.model = RNN(64, 80)
+        self.x_train, self.y_train, self.x_test, self.y_test = get_dataset(80)
+        self.embedding_layer = []
+        self._set_kvclient()
 
-    def setup_pserver_stub(self):
-        request = core_pb2.Worker()
-        request.id = self.worker_id
-        pserver_endpoints = self.master_stub.get_pserver(request)
-        self.pserver_stubs = []
-        for p in pserver_endpoints.endpoint:
-            channel = grpc.insecure_channel(p)
-            stub = core_pb2_grpc.KVStoreStub(channel)
-            self.pserver_stubs.append(stub)
+    def _set_kvclient(self):
+        for layer in self.model.layers:
+            if isinstance(layer, Embedding):
+                self.embedding_layer.append(layer)
+                layer.set_kvstore_client(self.kvstore_client)
 
-    def lookup_embedding_param(self, name, ids, dim):
-        tensor = Tensor(name, None, ids)
-        pb = core_pb2.Tensor()
-        serialize_to_pb(tensor, pb)
-        res = self.pserver_stubs[0].pull_embedding_param(pb)
-        know_ids = res.value.indices
-        unknown_ids = res.unknown_indices
+    def forward_backward(self, x, y):
+        with tf.GradientTape() as tape:
+            for layer in self.embedding_layer:
+                layer.set_tape(tape)
+            outputs = self.model.call(x, training=True)
+            if not self.init:
+                for var in self.model.trainable_variables:
+                    param = Tensor(name=var.name, value=var.numpy())
+                    self.kvstore_client.push_param(param)
+                self.init = True
+            outputs = tf.reshape(outputs, [-1])
+            self.loss = tf.keras.losses.binary_crossentropy(
+                y, outputs, from_logits=False
+            )
+            self.metric.update_state(
+                tf.where(outputs < 0.5, x=tf.zeros_like(y), y=tf.ones_like(y)),
+                y,
+            )
+            vars = []
+            vars.extend(self.model.trainable_variables)
+            for layer in self.embedding_layer:
+                vars.append(layer.batch_embedding_tensor)
+            self.grads = tape.gradient(self.loss, vars)
+            print(len(self.grads))
+            print(len(self.model.trainable_variables))
+            exit(0)
 
-        if len(unknown_ids) == 0:
-            tensor = Tensor()
-            deserialize_from_pb(res.value, tensor)
-            return tensor
+    def train(self):
+        train_data = tf.data.Dataset.from_tensor_slices(
+            (self.x_train, self.y_train)
+        )
+        train_data = train_data.batch(8).repeat(2)
 
-        values = []
-        for id in unknown_ids:
-            tmp = np.ones(dim)
-            values.append(tmp)
-        value = np.stack(values)
-        tensor = Tensor(name, value, unknown_ids)
-        pb = core_pb2.Tensor()
-        serialize_to_pb(tensor, pb)
-        self.pserver_stubs[0].push_embedding_param(pb)
-        res_new = self.pserver_stubs[0].pull_embedding_param(pb)
-        unknown_ids_new = res_new.unknown_indices
-        if len(unknown_ids_new) > 0:
-            raise Exception("Update embedding vector failed")
-
-        if len(know_ids) == 0:
-            return tensor
-        else:
-            know_tensor = Tensor()
-            deserialize_from_pb(res.value, know_tensor)
-            know_tensor.indices.extend(tensor.indices)
-            know_tensor.value = np.append(know_tensor.value, tensor.value)
-            new_dim = (-1,) + dim
-            know_tensor.value = np.reshape(know_tensor.value, new_dim)
-            return know_tensor
-
-    def push_embedding_param(self, param):
-        pb = core_pb2.Tensor()
-        serialize_to_pb(param, pb)
-        self.pserver_stubs[0].push_embedding_param(pb)
-
-    def push_embedding_grad(self, grad):
-        pb = core_pb2.Tensor()
-        serialize_to_pb(grad, pb)
-        self.pserver_stubs[0].push_embedding_grad(pb)
-
-    def pull_param(self, name):
-        pb = core_pb2.Tensor()
-        pb.name = name
-        res = self.pserver_stubs[0].pull_param(pb)
-        tensor = Tensor()
-        deserialize_from_pb(res, tensor)
-        return tensor
-
-    def push_grad(self, grad):
-        pb = core_pb2.Tensor()
-        serialize_to_pb(grad, pb)
-        self.pserver_stubs[0].push_grad(pb)
-
-    def push_param(self, param):
-        pb = core_pb2.Tensor()
-        serialize_to_pb(param, pb)
-        self.pserver_stubs[0].push_param(pb)
+        for step, (x, y) in enumerate(train_data):
+            self.forward_backward(x, y)
+            if step % 100 == 0:
+                print(
+                    step,
+                    "loss:",
+                    float(self.loss),
+                    "acc:",
+                    self.metric.result().numpy(),
+                )
+                self.metric.reset_states()
 
 
 if __name__ == "__main__":
@@ -100,21 +115,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     worker = Worker(args.endpoint, args.worker_id)
-
-    ids = [0, 1, 2, 3, 4, 5]
-    res = worker.lookup_embedding_param("tom", ids, (3,))
-    print(res.value)
-    print(res.indices)
-
-    ids = [0, 3, 3]
-    value = np.full((3, 3), 2.0)
-    grad = Tensor("tom", value, ids)
-
-    worker.push_embedding_grad(grad)
-
-    time.sleep(2)
-
-    ids = [0, 3, 7]
-    res = worker.lookup_embedding_param("tom", ids, (3,))
-    print(res.value)
-    print(res.indices)
+    worker.train()

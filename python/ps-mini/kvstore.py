@@ -52,7 +52,7 @@ class KVStoreServicer(core_pb2_grpc.KVStoreServicer):
         return pb
 
     def push_param(self, request, _):
-        tensor = core_pb2.Tensor()
+        tensor = Tensor()
         deserialize_from_pb(request, tensor)
         self.param_db[request.name] = tensor
         return empty_pb2.Empty()

@@ -97,6 +97,6 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--endpoint", type=str)
     args = parser.parse_args()
 
-    opt = SGD(lr=0.1)
+    opt = SGD(lr=0.01)
     ps = PServer(opt, 1)
     ps.start(args.endpoint)

@@ -48,7 +48,7 @@ class RNN(tf.keras.Model):
 def main():
     units = 64
     batch_size = 32
-    epochs = 1
+    epochs = 2
     model = RNN(units)
 
     optimizer = tf.keras.optimizers.Adam(0.001)
