@@ -6,7 +6,7 @@ CPU device
 
 ```bash
 docker run -u $(id -u):$(id -g) --rm -v eager_async:/eager_async --runtime=nvidia -it tensorflow/tensorflow:latest-gpu-py3 /bin/bash
-cd /eager_sync
+cd /eager_async
 python mnist_test.py
 ```
 
@@ -21,7 +21,7 @@ GPU device
 
 ```bash
 docker run -u $(id -u):$(id -g) --rm -v eager_async:/eager_async --runtime=nvidia -it tensorflow/tensorflow:latest-gpu-py3 /bin/bash
-cd /eager_sync
+cd /eager_async
 python resnet50_test.py
 ```
 
