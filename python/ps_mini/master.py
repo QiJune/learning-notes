@@ -28,13 +28,17 @@ class MasterServicer(core_pb2_grpc.MasterServicer):
 
     def start_pserver(self):
         for p in self.pserver_endpoints:
-            cmd = "python pserver.py -e " + str(p) + " &"
+            cmd = "python pserver/pserver.py -e " + str(p) + " &"
             subprocess.run(cmd, shell=True, check=True, text=True)
 
     def start_workers(self):
         for i in range(self.worker_num):
             cmd = (
-                "python worker.py -e " + self.endpoint + " -i " + str(i) + " &"
+                "python kvstore_client.py -e "
+                + self.endpoint
+                + " -i "
+                + str(i)
+                + " &"
             )
             subprocess.run(cmd, shell=True, check=True, text=True)
 

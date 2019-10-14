@@ -43,7 +43,7 @@ class KVStoreClient(object):
         values = []
         for id in unknown_ids:
             initializer = tf.keras.initializers.get(initializer)
-            tmp = initializer(shape=[dim]).numpy()
+            tmp = initializer(shape=dim).numpy()
             values.append(tmp)
         value = np.stack(values)
         tensor = Tensor(name, value, unknown_ids)

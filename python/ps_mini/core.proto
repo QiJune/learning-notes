@@ -28,10 +28,14 @@ message EmbeddingResponse {
 service KVStore {
     rpc pull_param(Tensor) returns (Tensor) {}
     rpc push_param(Tensor) returns (google.protobuf.Empty) {}
-    rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
 
     rpc pull_embedding_param(Tensor) returns (EmbeddingResponse) {}
     rpc push_embedding_param(Tensor) returns (google.protobuf.Empty) {}
+}
+
+
+service GradientQueue {
+    rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
     rpc push_embedding_grad(Tensor) returns (google.protobuf.Empty) {}
 }
 
