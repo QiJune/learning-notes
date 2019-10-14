@@ -3,8 +3,9 @@ import subprocess
 import time
 from concurrent import futures
 
-import core_pb2
-import core_pb2_grpc
+from ps_mini.proto.core_pb2 import EndPoint
+import ps_mini.proto.core_pb2_grpc as core_pb2_grpc
+
 import grpc
 import yaml
 
@@ -21,21 +22,20 @@ class MasterServicer(core_pb2_grpc.MasterServicer):
                 print(exc)
 
     def get_pserver(self, request, _):
-        response = core_pb2.EndPoint()
+        response = EndPoint()
         print(self.pserver_endpoints)
         response.endpoint.extend(self.pserver_endpoints)
         return response
 
     def start_pserver(self):
         for p in self.pserver_endpoints:
-            cmd = "python pserver.py -e " + str(p) + " &"
+            cmd = "python pserver/pserver.py -e " + str(p) + " &"
             subprocess.run(cmd, shell=True, check=True, text=True)
 
     def start_workers(self):
         for i in range(self.worker_num):
-            cmd = (
-                "python worker.py -e " + self.endpoint + " -i " + str(i) + " &"
-            )
+            cmd = ("python kvstore_client.py -e " + self.endpoint + " -i " +
+                   str(i) + " &")
             subprocess.run(cmd, shell=True, check=True, text=True)
 
 

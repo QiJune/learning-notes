@@ -1,5 +1,5 @@
 ```bash
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. core.proto
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. ./ps_mini/proto/core.proto
 
 python master.py -e localhost:8000
 

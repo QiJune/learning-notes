@@ -1,4 +1,4 @@
-import core_pb2
+from ps_mini.proto import core_pb2
 import numpy as np
 
 
@@ -60,11 +60,17 @@ def size_of_dtype(dtype):
 
 
 class Tensor(object):
-    def __init__(self, name=None, value=None, indices=None, version=None):
+    def __init__(self,
+                 name=None,
+                 value=None,
+                 indices=None,
+                 version=None,
+                 initializer=None):
         self.name = name
         self.value = value
         self.indices = indices
         self.version = version
+        self.initializer = initializer
 
     def debug_string(self):
         res = ""
@@ -74,6 +80,10 @@ class Tensor(object):
             res += "value: " + str(self.value) + "\n"
         if self.indices is not None:
             res += "indices: " + str(self.indices)
+        if self.initializer:
+            res += "initializer: " + str(self.initializer) + "\n"
+        if self.version:
+            res += "version: " + str(self.version) + "\n"
         return res
 
 
@@ -85,8 +95,10 @@ def serialize_to_pb(tensor, pb):
         pb.content = tensor.value.tobytes()
     if tensor.indices is not None:
         pb.indices.extend(tensor.indices)
-    if tensor.version:
+    if tensor.version is not None:
         pb.version = tensor.version
+    if tensor.initializer is not None:
+        pb.initializer = tensor.initializer
 
 
 def deserialize_from_pb(pb, tensor):
@@ -111,3 +123,4 @@ def deserialize_from_pb(pb, tensor):
     tensor.name = pb.name
     tensor.indices = pb.indices
     tensor.version = pb.version
+    tensor.initializer = pb.initializer

@@ -7,17 +7,17 @@ import tensorflow as tf
 from tensorflow.python.eager import context, tape
 
 
-
 def random_batch(batch_size):
     """Create synthetic resnet50 images and labels for testing."""
     shape = (28, 28)
-    shape = (batch_size,) + shape
+    shape = (batch_size, ) + shape
 
     num_classes = 10
     images = tf.random.uniform(shape)
-    labels = tf.random.uniform(
-        [batch_size], minval=0, maxval=num_classes, dtype=tf.int32
-    )
+    labels = tf.random.uniform([batch_size],
+                               minval=0,
+                               maxval=num_classes,
+                               dtype=tf.int32)
 
     return images, labels
 
@@ -26,9 +26,8 @@ def compute_gradients(model, images, labels, num_replicas=1):
     with tf.GradientTape() as grad_tape:
         logits = model(images, training=True)
         labels = tf.reshape(labels, [-1])
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels
-        )
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
+                                                              labels=labels)
         if num_replicas != 1:
             loss /= num_replicas
 
@@ -52,9 +51,8 @@ class ModelTest(tf.test.TestCase):
         with tf.device("CPU"), context.execution_mode(execution_mode):
             optimizer = tf.keras.optimizers.SGD(0.1)
             images, labels = random_batch(1000)
-            apply_gradients(
-                model, optimizer, compute_gradients(model, images, labels)
-            )
+            apply_gradients(model, optimizer,
+                            compute_gradients(model, images, labels))
             context.async_wait()
         end = time.process_time()
         print("time: ", end - start)

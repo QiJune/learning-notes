@@ -33,15 +33,13 @@ def get_dataset(max_review_length):
     # load the dataset but only keep the top n words, zero the rest
     top_words = 5000
 
-    (X_train, y_train), (X_test, y_test) = tf.keras.datasets.imdb.load_data(
-        num_words=top_words
-    )
+    (X_train,
+     y_train), (X_test,
+                y_test) = tf.keras.datasets.imdb.load_data(num_words=top_words)
     x_train = tf.keras.preprocessing.sequence.pad_sequences(
-        X_train, maxlen=max_review_length
-    )
+        X_train, maxlen=max_review_length)
     x_test = tf.keras.preprocessing.sequence.pad_sequences(
-        X_test, maxlen=max_review_length
-    )
+        X_test, maxlen=max_review_length)
 
     return x_train, y_train, x_test, y_test
 
@@ -73,9 +71,9 @@ class Worker(object):
                     self.kvstore_client.push_param(param)
                 self.init = True
             outputs = tf.reshape(outputs, [-1])
-            self.loss = tf.keras.losses.binary_crossentropy(
-                y, outputs, from_logits=False
-            )
+            self.loss = tf.keras.losses.binary_crossentropy(y,
+                                                            outputs,
+                                                            from_logits=False)
             self.metric.update_state(
                 tf.where(outputs < 0.5, x=tf.zeros_like(y), y=tf.ones_like(y)),
                 y,
@@ -91,8 +89,7 @@ class Worker(object):
 
     def train(self):
         train_data = tf.data.Dataset.from_tensor_slices(
-            (self.x_train, self.y_train)
-        )
+            (self.x_train, self.y_train))
         train_data = train_data.batch(8).repeat(2)
 
         for step, (x, y) in enumerate(train_data):

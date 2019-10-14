@@ -1,12 +1,11 @@
 import argparse
 import time
 
-import core_pb2
-import core_pb2_grpc
+from ps_mini.proto import core_pb2
+from ps_mini.proto import core_pb2_grpc
 import grpc
 import numpy as np
-import tensorflow as tf
-from tensor import Tensor, deserialize_from_pb, serialize_to_pb
+from ps_mini.tensor import Tensor, deserialize_from_pb, serialize_to_pb
 
 
 class KVStoreClient(object):
@@ -24,47 +23,17 @@ class KVStoreClient(object):
         self.pserver_stubs = []
         for p in pserver_endpoints.endpoint:
             channel = grpc.insecure_channel(p)
-            stub = core_pb2_grpc.KVStoreStub(channel)
+            stub = core_pb2_grpc.PServerStub(channel)
             self.pserver_stubs.append(stub)
 
-    def pull_embedding_param(self, name, ids, dim, initializer):
+    def pull_embedding_param(self, name, ids):
         tensor = Tensor(name, None, ids)
         pb = core_pb2.Tensor()
         serialize_to_pb(tensor, pb)
         res = self.pserver_stubs[0].pull_embedding_param(pb)
-        know_ids = res.value.indices
-        unknown_ids = res.unknown_indices
-
-        if len(unknown_ids) == 0:
-            tensor = Tensor()
-            deserialize_from_pb(res.value, tensor)
-            return tensor
-
-        values = []
-        for id in unknown_ids:
-            initializer = tf.keras.initializers.get(initializer)
-            tmp = initializer(shape=[dim]).numpy()
-            values.append(tmp)
-        value = np.stack(values)
-        tensor = Tensor(name, value, unknown_ids)
-        pb = core_pb2.Tensor()
-        serialize_to_pb(tensor, pb)
-        self.pserver_stubs[0].push_embedding_param(pb)
-        res_new = self.pserver_stubs[0].pull_embedding_param(pb)
-        unknown_ids_new = res_new.unknown_indices
-        if len(unknown_ids_new) > 0:
-            raise Exception("Update embedding vector failed")
-
-        if len(know_ids) == 0:
-            return tensor
-        else:
-            know_tensor = Tensor()
-            deserialize_from_pb(res.value, know_tensor)
-            know_tensor.indices.extend(tensor.indices)
-            know_tensor.value = np.append(know_tensor.value, tensor.value)
-            new_dim = (-1,) + dim
-            know_tensor.value = np.reshape(know_tensor.value, new_dim)
-            return know_tensor
+        res_tensor = Tensor()
+        deserialize_from_pb(res, res_tensor)
+        return res_tensor
 
     def push_embedding_param(self, param):
         pb = core_pb2.Tensor()
@@ -103,10 +72,17 @@ if __name__ == "__main__":
 
     worker = KVStoreClient(args.endpoint, args.worker_id)
 
+    init_param = Tensor(name="tom",
+                        value=np.ones(shape=(3, )),
+                        initializer="uniform")
+    worker.push_embedding_param(init_param)
+
     ids = [0, 1, 2, 3, 4, 5]
-    res = worker.pull_embedding_param("tom", ids, (3,), "uniform")
+    res = worker.pull_embedding_param("tom", ids)
     print(res.value)
     print(res.indices)
+
+    time.sleep(2)
 
     ids = [0, 3, 3]
     value = np.full((3, 3), 2.0)
@@ -117,6 +93,6 @@ if __name__ == "__main__":
     time.sleep(2)
 
     ids = [0, 3, 7]
-    res = worker.pull_embedding_param("tom", ids, (3,), "uniform")
+    res = worker.pull_embedding_param("tom", ids)
     print(res.value)
     print(res.indices)
