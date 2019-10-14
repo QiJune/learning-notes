@@ -42,12 +42,12 @@ def compute_gradients(model, images, labels, num_replicas=1):
     # multi-threaded environment. Explicitly disable recording until
     # this is fixed.
     with tape.stop_recording():
-        grads = grad_tape.gradient(loss, model.variables)
+        grads = grad_tape.gradient(loss, model.trainable_variables)
     return grads
 
 
 def apply_gradients(model, optimizer, gradients):
-    optimizer.apply_gradients(zip(gradients, model.variables))
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
 
 class ResNet50Test(tf.test.TestCase):
