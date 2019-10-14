@@ -1,6 +1,9 @@
 ## mnist test
 
 
+CPU device
+
+
 ```python
 python mnist_test.py
 ```
@@ -9,6 +12,9 @@ python mnist_test.py
 - async mode: 4.755175999999999s
 
 ## resnet50 test
+
+
+GPU device
 
 
 ```python
