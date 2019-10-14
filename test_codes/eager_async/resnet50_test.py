@@ -1,32 +1,37 @@
 import time
 
-import mnist
+import resnet50
 import tensorflow as tf
 from tensorflow.python.eager import context, tape
 
 
-def random_batch(batch_size):
+def device_and_data_format():
+    if tf.config.experimental.list_physical_devices("GPU"):
+        return ("/gpu:0", "channels_first")
+    return ("/cpu:0", "channels_last")
+
+
+def random_batch(batch_size, data_format):
     """Create synthetic resnet50 images and labels for testing."""
-    shape = (28, 28)
+    shape = (3, 224, 224) if data_format == "channels_first" else (224, 224, 3)
     shape = (batch_size,) + shape
 
-    num_classes = 10
-    images = tf.random.uniform(shape)
-    labels = tf.random.uniform(
+    num_classes = 1000
+    images = tf.random_uniform(shape)
+    labels = tf.random_uniform(
         [batch_size], minval=0, maxval=num_classes, dtype=tf.int32
     )
+    one_hot = tf.one_hot(labels, num_classes)
 
-    return images, labels
+    return images, one_hot
 
 
 def compute_gradients(model, images, labels, num_replicas=1):
     with tf.GradientTape() as grad_tape:
         logits = model(images, training=True)
-        labels = tf.reshape(labels, [-1])
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels
+        loss = tf.losses.softmax_cross_entropy(
+            logits=logits, onehot_labels=labels
         )
-        tf.compat.v2.summary.write("loss", loss)
         if num_replicas != 1:
             loss /= num_replicas
 
@@ -42,14 +47,14 @@ def apply_gradients(model, optimizer, gradients):
     optimizer.apply_gradients(zip(gradients, model.variables))
 
 
-class ModelTest(tf.test.TestCase):
+class ResNet50Test(tf.test.TestCase):
     def _test_train(self, execution_mode=None):
         start = time.process_time()
-        model = mnist.custom_model()
-
-        with tf.device("CPU"), context.execution_mode(execution_mode):
+        device, data_format = device_and_data_format()
+        model = resnet50.ResNet50(data_format)
+        with tf.device(device), context.execution_mode(execution_mode):
             optimizer = tf.keras.optimizers.SGD(0.1)
-            images, labels = random_batch(1000)
+            images, labels = random_batch(2, data_format)
             apply_gradients(
                 model, optimizer, compute_gradients(model, images, labels)
             )
