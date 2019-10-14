@@ -18,27 +18,17 @@ message Tensor {
     bytes content = 4;
     repeated int64 indices = 5;
     int64 version = 6;
+    string initializer = 7;
 }
 
-message EmbeddingResponse {
-    Tensor value = 1;
-    repeated int64 unknown_indices = 2;
-}
-
-service KVStore {
+service PServer {
     rpc pull_param(Tensor) returns (Tensor) {}
     rpc push_param(Tensor) returns (google.protobuf.Empty) {}
-
-    rpc pull_embedding_param(Tensor) returns (EmbeddingResponse) {}
+    rpc pull_embedding_param(Tensor) returns (Tensor) {}
     rpc push_embedding_param(Tensor) returns (google.protobuf.Empty) {}
-}
-
-
-service GradientQueue {
     rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
     rpc push_embedding_grad(Tensor) returns (google.protobuf.Empty) {}
 }
-
 
 message EndPoint {
     repeated string endpoint = 1;

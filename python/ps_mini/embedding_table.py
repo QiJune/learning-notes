@@ -1,33 +1,34 @@
+from ps_mini.tensor import Tensor
+
+import tensorflow as tf
 import numpy as np
-from tensor import Tensor
 
 
 class EmbeddingTable(object):
-    def __init__(self, name, version=None):
+    def __init__(self, name, version=None, dim=None, initializer=None):
         self.name = name
         self.version = version
         self.vectors = {}
+        self.dim = dim
+        self.initializer = initializer
 
     def get(self, ids):
         values = []
-        know_ids = []
-        unknow_ids = []
-
-        for id in ids:
-            if id not in self.vectors:
-                unknow_ids.append(id)
+        for i in ids:
+            if i not in self.vectors:
+                initializer = tf.keras.initializers.get(self.initializer)
+                value = initializer(shape=self.dim).numpy()
+                self.vectors[i] = value
             else:
-                value = self.vectors[id]
-                values.append(value)
-                know_ids.append(id)
+                value = self.vectors[i]
+            values.append(value)
 
         if len(values) == 0:
             tensor = Tensor(self.name, None, None, self.version)
         else:
             values = np.stack(values)
-            tensor = Tensor(self.name, values, know_ids, self.version)
-
-        return tensor, unknow_ids
+            tensor = Tensor(self.name, values, ids, self.version)
+        return tensor
 
     def set(self, ids, value):
         for index, id in enumerate(ids):

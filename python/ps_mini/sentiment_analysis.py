@@ -13,17 +13,15 @@ np.random.seed(22)
 top_words = 5000
 # truncate and pad input sequences
 max_review_length = 80
-(X_train, y_train), (X_test, y_test) = tf.keras.datasets.imdb.load_data(
-    num_words=top_words
-)
+(X_train,
+ y_train), (X_test,
+            y_test) = tf.keras.datasets.imdb.load_data(num_words=top_words)
 
 print("Pad sequences (samples x time)")
 x_train = tf.keras.preprocessing.sequence.pad_sequences(
-    X_train, maxlen=max_review_length
-)
+    X_train, maxlen=max_review_length)
 x_test = tf.keras.preprocessing.sequence.pad_sequences(
-    X_test, maxlen=max_review_length
-)
+    X_test, maxlen=max_review_length)
 print("x_train shape:", x_train.shape)
 print("x_test shape:", x_test.shape)
 
@@ -34,8 +32,7 @@ class RNN(tf.keras.Model):
 
         self.rnn = tf.keras.layers.LSTM(units)
         self.embedding = tf.keras.layers.Embedding(
-            top_words, 100, input_length=max_review_length
-        )
+            top_words, 100, input_length=max_review_length)
         self.fc = tf.keras.layers.Dense(1, activation="sigmoid")
 
     def call(self, inputs, training):
@@ -60,20 +57,18 @@ def main():
         with tf.GradientTape() as tape:
             outputs = model.call(x, training=True)
             outputs = tf.reshape(outputs, [-1])
-            loss = tf.keras.losses.binary_crossentropy(
-                y, outputs, from_logits=False
-            )
+            loss = tf.keras.losses.binary_crossentropy(y,
+                                                       outputs,
+                                                       from_logits=False)
 
         acc_meter.update_state(
-            tf.where(outputs < 0.5, x=tf.zeros_like(y), y=tf.ones_like(y)), y
-        )
+            tf.where(outputs < 0.5, x=tf.zeros_like(y), y=tf.ones_like(y)), y)
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
         if step % 100 == 0:
-            print(
-                step, "loss:", float(loss), "acc:", acc_meter.result().numpy()
-            )
+            print(step, "loss:", float(loss), "acc:",
+                  acc_meter.result().numpy())
             acc_meter.reset_states()
 
 

@@ -2,8 +2,8 @@ import tensorflow as tf
 
 
 def convert_to_var(param):
-    if param.indices:
-        new_dim = (None,) + param.value.shape[1:]
+    if param.indices is not None:
+        new_dim = (None, ) + param.value.shape[1:]
         shape = tf.TensorShape(new_dim)
         var = tf.Variable(param.value, shape=shape)
         return var
@@ -35,9 +35,8 @@ class Optimizer(object):
         if len(param.indices) == 0:
             self.kvstore.set_param(param.name, param)
         else:
-            self.kvstore.set_embedding_param(
-                param.name, param.indices, param.value
-            )
+            self.kvstore.set_embedding_param(param.name, param.indices,
+                                             param.value)
 
     def get_grad(self):
         return self.grad_queue.get_grad()
