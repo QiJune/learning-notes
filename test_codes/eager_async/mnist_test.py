@@ -1,8 +1,11 @@
+import os
 import time
 
 import mnist
 import tensorflow as tf
 from tensorflow.python.eager import context, tape
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 
 def random_batch(batch_size):

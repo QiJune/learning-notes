@@ -1,8 +1,11 @@
+import os
 import time
 
 import resnet50
 import tensorflow as tf
 from tensorflow.python.eager import context, tape
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 
 def device_and_data_format():
