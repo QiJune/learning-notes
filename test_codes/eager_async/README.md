@@ -4,7 +4,9 @@
 CPU device
 
 
-```python
+```bash
+docker run -u $(id -u):$(id -g) --rm -v eager_async:/eager_async --runtime=nvidia -it tensorflow/tensorflow:latest-gpu-py3 /bin/bash
+cd /eager_async
 python mnist_test.py
 ```
 
@@ -17,11 +19,13 @@ python mnist_test.py
 GPU device
 
 
-```python
+```bash
+docker run -u $(id -u):$(id -g) --rm -v eager_async:/eager_async --runtime=nvidia -it tensorflow/tensorflow:latest-gpu-py3 /bin/bash
+cd /eager_async
 python resnet50_test.py
 ```
 
 
 - sync mode: 6.446621275s
-- async model: 3.3482721249999994s
+- async mode: 3.3482721249999994s
 
