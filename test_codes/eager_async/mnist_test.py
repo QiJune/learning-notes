@@ -26,7 +26,6 @@ def compute_gradients(model, images, labels, num_replicas=1):
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels
         )
-        tf.compat.v2.summary.write("loss", loss)
         if num_replicas != 1:
             loss /= num_replicas
 

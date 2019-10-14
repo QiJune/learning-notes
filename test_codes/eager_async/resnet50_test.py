@@ -21,16 +21,15 @@ def random_batch(batch_size, data_format):
     labels = tf.random.uniform(
         [batch_size], minval=0, maxval=num_classes, dtype=tf.int32
     )
-    one_hot = tf.one_hot(labels, num_classes)
-
-    return images, one_hot
+    return images, labels
 
 
 def compute_gradients(model, images, labels, num_replicas=1):
     with tf.GradientTape() as grad_tape:
         logits = model(images, training=True)
-        loss = tf.losses.softmax_cross_entropy(
-            logits=logits, onehot_labels=labels
+        labels = tf.reshape(labels, [-1])
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=logits, labels=labels
         )
         if num_replicas != 1:
             loss /= num_replicas
