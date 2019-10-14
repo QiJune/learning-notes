@@ -27,5 +27,5 @@ python resnet50_test.py
 
 
 - sync mode: 6.446621275s
-- async model: 3.3482721249999994s
+- async mode: 3.3482721249999994s
 
