@@ -55,13 +55,14 @@ class ResNet50Test(tf.test.TestCase):
         start = time.process_time()
         device, data_format = device_and_data_format()
         model = resnet50.ResNet50(data_format)
-        with tf.device(device), context.execution_mode(execution_mode):
-            optimizer = tf.keras.optimizers.SGD(0.1)
-            images, labels = random_batch(2, data_format)
-            apply_gradients(
-                model, optimizer, compute_gradients(model, images, labels)
-            )
-            context.async_wait()
+        for i in range(10):
+            with tf.device(device), context.execution_mode(execution_mode):
+                optimizer = tf.keras.optimizers.SGD(0.1)
+                images, labels = random_batch(2, data_format)
+                apply_gradients(
+                    model, optimizer, compute_gradients(model, images, labels)
+                )
+                context.async_wait()
         end = time.process_time()
         print("time: ", end - start)
 
