@@ -58,7 +58,7 @@ class ResNet50Test(tf.test.TestCase):
         for i in range(10):
             with tf.device(device), context.execution_mode(execution_mode):
                 optimizer = tf.keras.optimizers.SGD(0.1)
-                images, labels = random_batch(2, data_format)
+                images, labels = random_batch(32, data_format)
                 apply_gradients(
                     model, optimizer, compute_gradients(model, images, labels)
                 )
