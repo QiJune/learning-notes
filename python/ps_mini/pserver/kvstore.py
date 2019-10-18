@@ -4,12 +4,16 @@ class KVStore(object):
         self.embedding_param_db = {}
 
     def get_param(self, name):
+        if name not in self.param_db:
+            return None
         return self.param_db[name]
 
     def set_param(self, name, value):
         self.param_db[name] = value
 
     def get_embedding_param(self, name, ids):
+        if name not in self.embedding_param_db:
+            return None
         param = self.embedding_param_db[name].get(ids)
         return param
 

@@ -7,7 +7,7 @@ from ps_mini.pserver.kvstore import KVStore
 from ps_mini.pserver.optimizer import Optimizer
 from tensorflow.keras.optimizers import SGD
 from google.protobuf import empty_pb2
-from ps_mini.embedding_table import EmbeddingTable
+from ps_mini.pserver.embedding_table import EmbeddingTable
 
 from ps_mini.proto.core_pb2 import Tensor as TensorPB
 from ps_mini.tensor import Tensor, serialize_to_pb, deserialize_from_pb
@@ -34,22 +34,23 @@ class PServer(object):
 
     def pull_embedding_param(self, request, _):
         pb = TensorPB()
-        if request.name not in self.kvstore.embedding_param_db:
+        tensor = self.kvstore.get_embedding_param(request.name,
+                                                  request.indices)
+        if tensor is None:
             embedding_param = EmbeddingTable(request.name, 0, request.dim,
                                              request.initializer)
             self.kvstore.set_embedding_table(request.name, embedding_param)
-        ids = request.indices
-        tensor = self.kvstore.get_embedding_param(request.name, ids)
+            tensor = self.kvstore.get_embedding_param(request.name,
+                                                      request.indices)
         serialize_to_pb(tensor, pb)
         return pb
 
     def push_embedding_param(self, request, _):
         tensor = Tensor()
         deserialize_from_pb(request, tensor)
-        if request.name not in self.kvstore.embedding_param_db:
-            embedding_param = EmbeddingTable(request.name, 0, request.dim,
-                                             request.initializer)
-            self.kvstore.set_embedding_table(request.name, embedding_param)
+        embedding_param = EmbeddingTable(request.name, 0, request.dim,
+                                         request.initializer)
+        self.kvstore.set_embedding_table(request.name, embedding_param)
         return empty_pb2.Empty()
 
     def push_grad(self, request, _):

@@ -1,5 +1,4 @@
 syntax = "proto3";
-
 import "google/protobuf/empty.proto";
 
 message Tensor {
@@ -28,16 +27,4 @@ service PServer {
     rpc push_embedding_param(Tensor) returns (google.protobuf.Empty) {}
     rpc push_grad(Tensor) returns (google.protobuf.Empty) {}
     rpc push_embedding_grad(Tensor) returns (google.protobuf.Empty) {}
-}
-
-message EndPoint {
-    repeated string endpoint = 1;
-}
-
-message Worker {
-    int64 id = 1;
-}
-
-service Master {
-    rpc get_pserver(Worker) returns (EndPoint) {}
 }

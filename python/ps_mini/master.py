@@ -1,18 +1,10 @@
-import argparse
 import subprocess
 import time
-from concurrent import futures
-
-from ps_mini.proto.core_pb2 import EndPoint
-import ps_mini.proto.core_pb2_grpc as core_pb2_grpc
-
-import grpc
 import yaml
 
 
-class MasterServicer(core_pb2_grpc.MasterServicer):
-    def __init__(self, endpoint):
-        self.endpoint = endpoint
+class Master(object):
+    def __init__(self):
         with open("config.yaml", "r") as stream:
             try:
                 data = yaml.safe_load(stream)
@@ -21,12 +13,6 @@ class MasterServicer(core_pb2_grpc.MasterServicer):
             except yaml.YAMLError as exc:
                 print(exc)
 
-    def get_pserver(self, request, _):
-        response = EndPoint()
-        print(self.pserver_endpoints)
-        response.endpoint.extend(self.pserver_endpoints)
-        return response
-
     def start_pserver(self):
         for p in self.pserver_endpoints:
             cmd = "python pserver/pserver.py -e " + str(p) + " &"
@@ -34,24 +20,13 @@ class MasterServicer(core_pb2_grpc.MasterServicer):
 
     def start_workers(self):
         for i in range(self.worker_num):
-            cmd = ("python kvstore_client.py -e " + self.endpoint + " -i " +
-                   str(i) + " &")
+            cmd = ("python worker.py -p " + " ".join(self.pserver_endpoints) +
+                   " -i " + str(i) + " &")
             subprocess.run(cmd, shell=True, check=True, text=True)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--endpoint", type=str)
-    args = parser.parse_args()
-
-    # Start Master
-    master = MasterServicer(args.endpoint)
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    core_pb2_grpc.add_MasterServicer_to_server(master, server)
-
-    print("Starting Master. Listening on endpoint %s." % args.endpoint)
-    server.add_insecure_port(args.endpoint)
-    server.start()
+    master = Master()
 
     # Start Pserver
     master.start_pserver()
@@ -64,4 +39,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(86400)
     except KeyboardInterrupt:
-        server.stop(0)
+        exit(0)

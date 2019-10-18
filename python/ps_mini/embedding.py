@@ -65,8 +65,6 @@ class Embedding(tf.keras.layers.Layer):
         self.batch_embedding = self.kvstore_client.pull_embedding_param(
             self.name,
             unique_ids.numpy(),
-            self.output_dim,
-            self.embedding_initializer,
         )
         self.batch_embedding_tensor = tf.convert_to_tensor(
             self.batch_embedding.value)

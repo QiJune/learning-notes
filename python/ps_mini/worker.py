@@ -52,13 +52,19 @@ class Worker(object):
         self.model = RNN(64, 80)
         self.x_train, self.y_train, self.x_test, self.y_test = get_dataset(80)
         self.embedding_layer = []
-        self._set_kvclient()
+        self.embedding_layer_info = []
+        self._init_embedding_layer()
 
-    def _set_kvclient(self):
+    def _init_embedding_layer(self):
         for layer in self.model.layers:
             if isinstance(layer, Embedding):
                 self.embedding_layer.append(layer)
                 layer.set_kvstore_client(self.kvstore_client)
+                name = layer.name
+                output_dim = layer.output_dim
+                initializer = layer.embedding_initializer
+                self.embedding_layer_info.append(
+                    (name, output_dim, initializer))
 
     def forward_backward(self, x, y):
         with tf.GradientTape() as tape:
@@ -69,6 +75,14 @@ class Worker(object):
                 for var in self.model.trainable_variables:
                     param = Tensor(name=var.name, value=var.numpy())
                     self.kvstore_client.push_param(param)
+
+                for embedding_info in self.embedding_layer_info:
+                    name, output_dim, initializer = embedding_info
+                    param = Tensor(name=name,
+                                   value=np.ones(shape=output_dim),
+                                   initializer=initializer)
+                    self.kvstore_client.push_embedding_param(param)
+
                 self.init = True
             outputs = tf.reshape(outputs, [-1])
             self.loss = tf.keras.losses.binary_crossentropy(y,
@@ -107,9 +121,9 @@ class Worker(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--endpoint", type=str)
+    parser.add_argument('-p', '--pserver_endpoints', nargs='+', required=True)
     parser.add_argument("-i", "--worker_id", type=int)
     args = parser.parse_args()
 
-    worker = Worker(args.endpoint, args.worker_id)
+    worker = Worker(args.pserver_endpoints, args.worker_id)
     worker.train()

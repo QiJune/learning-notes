@@ -9,19 +9,14 @@ from ps_mini.tensor import Tensor, deserialize_from_pb, serialize_to_pb
 
 
 class KVStoreClient(object):
-    def __init__(self, master_endpoint, worker_id):
-        self.master_endpoint = master_endpoint
+    def __init__(self, pserver_endpoints, worker_id):
+        self.pserver_endpoints = pserver_endpoints
         self.worker_id = worker_id
-        self.master_channel = grpc.insecure_channel(self.master_endpoint)
-        self.master_stub = core_pb2_grpc.MasterStub(self.master_channel)
         self.setup_pserver_stub()
 
     def setup_pserver_stub(self):
-        request = core_pb2.Worker()
-        request.id = self.worker_id
-        pserver_endpoints = self.master_stub.get_pserver(request)
         self.pserver_stubs = []
-        for p in pserver_endpoints.endpoint:
+        for p in self.pserver_endpoints:
             channel = grpc.insecure_channel(p)
             stub = core_pb2_grpc.PServerStub(channel)
             self.pserver_stubs.append(stub)
@@ -66,11 +61,13 @@ class KVStoreClient(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--endpoint", type=str)
+    parser.add_argument('-p', '--pserver_endpoints', nargs='+', required=True)
     parser.add_argument("-i", "--worker_id", type=int)
     args = parser.parse_args()
 
-    worker = KVStoreClient(args.endpoint, args.worker_id)
+    worker = KVStoreClient(args.pserver_endpoints, args.worker_id)
+    print("Starting worker. Connecting to pserver %s." %
+          " ".join(args.pserver_endpoints))
 
     init_param = Tensor(name="tom",
                         value=np.ones(shape=(3, )),
