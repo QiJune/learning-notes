@@ -7,5 +7,4 @@ gomain :
 	go build -o gomain main.go
 
 clean :
-	rm ccmain gomain *.dylib 
-    
+	rm -f ccmain gomain *.dylib
