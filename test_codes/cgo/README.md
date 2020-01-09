@@ -16,5 +16,5 @@ make gomain
 
 About 100w times adam optimization:
 
-cgo: 1.28759882s
-c++: 1.17579s
+- cgo: 1.28759882s
+- c++: 1.17579s
