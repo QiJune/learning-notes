@@ -41,7 +41,7 @@ int main() {
   std::cout << "Time comsumd: "
             << double(duration) * std::chrono::microseconds::period::num /
                    std::chrono::microseconds::period::den
-            << " s" << std::endl;
+            << "s" << std::endl;
 
   delete[] mom1;
   delete[] mom2;
